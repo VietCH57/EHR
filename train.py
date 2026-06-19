@@ -7,6 +7,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from sklearn.model_selection import StratifiedKFold
 from sklearn.metrics import roc_auc_score
+from tqdm import tqdm  
 
 from model import EHRMambaTransformer
 from dataset import load_and_preprocess_data, EHRDataset
@@ -33,8 +34,14 @@ def main():
     torch.manual_seed(seed)
     np.random.seed(seed)
     os.makedirs(args.save_dir, exist_ok=True)
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
+    # Kiểm tra và hiển thị thiết bị phần cứng khi khởi tạo
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print("=" * 50)
+    print(f" KHỞI TẠO THIẾT BỊ: Đang sử dụng [{device.upper()}] để huấn luyện mô hình.")
+    print("=" * 50)
+    
+    print("Đang tải và tiền xử lý dữ liệu từ file pkl...")
     train_df, test_df, num_cols, cat_cols, cat_dims, target_col, id_col = load_and_preprocess_data(args.train_path, args.test_path)
     
     meta = {'num_cols': num_cols, 'cat_cols': cat_cols, 'cat_dims': cat_dims, 'target_col': target_col, 'id_col': id_col}
@@ -46,7 +53,7 @@ def main():
     oof_predictions = np.zeros(len(train_df))
     
     for fold, (train_idx, val_idx) in enumerate(skf.split(X, y)):
-        print(f"\n--- Train Fold {fold + 1}/5 ---")
+        print(f"\n⚡ Huấn luyện Fold {fold + 1}/5")
         train_loader = DataLoader(EHRDataset(X.iloc[train_idx].reset_index(drop=True), num_cols, cat_cols, target_col), batch_size=batch_size, shuffle=True, drop_last=True)
         val_loader = DataLoader(EHRDataset(X.iloc[val_idx].reset_index(drop=True), num_cols, cat_cols, target_col), batch_size=batch_size, shuffle=False)
         
@@ -58,14 +65,24 @@ def main():
         best_auc = 0.0
         for epoch in range(epochs):
             model.train()
-            for batch in train_loader:
+            train_loss = 0.0
+            
+            # Sử dụng tqdm tạo progress bar chạy cho từng Batch
+            pbar = tqdm(train_loader, desc=f"Epoch {epoch + 1:02d}/{epochs:02d}", leave=False)
+            for batch in pbar:
                 optimizer.zero_grad()
                 logits = model(batch['num_feats'].to(device), batch['cat_feats'].to(device), batch['deltas'].to(device))
                 loss = criterion(logits, batch['target'].to(device))
                 loss.backward()
                 optimizer.step()
+                
+                train_loss += loss.item()
+                # Hiển thị trạng thái loss hiện tại lên thanh tiến trình
+                pbar.set_postfix({"Loss": f"{loss.item():.4f}", "Device": str(device).upper()})
+                
             scheduler.step()
             
+            # Đánh giá trên tập Validation cuối mỗi Epoch
             model.eval()
             val_preds, val_targets = [], []
             with torch.no_grad():
@@ -79,7 +96,9 @@ def main():
                 best_auc = val_auc
                 torch.save(model.state_dict(), os.path.join(args.save_dir, f'model_fold_{fold}.pt'))
                 
-        print(f"Fold {fold + 1} Best Val ROC-AUC: {best_auc:.4f}")
+        print(f" Kết quả Fold {fold + 1} - Best Val ROC-AUC: {best_auc:.4f}")
+        
+        # Tạo dự đoán Out-of-Fold (OOF) từ checkpoint tốt nhất
         model.load_state_dict(torch.load(os.path.join(args.save_dir, f'model_fold_{fold}.pt')))
         model.eval()
         fold_preds = []
@@ -89,7 +108,9 @@ def main():
                 fold_preds.extend(torch.sigmoid(logits).cpu().numpy())
         oof_predictions[val_idx] = fold_preds
 
-    print(f"\nOverall Out-of-Fold ROC-AUC: {roc_auc_score(y, oof_predictions):.4f}")
+    print("\n" + "=" * 50)
+    print(f" CHỈ SỐ TOÀN BỘ MÔ HÌNH (5-Fold OOF ROC-AUC): {roc_auc_score(y, oof_predictions):.4f}")
+    print("=" * 50)
 
 if __name__ == '__main__':
     main()
