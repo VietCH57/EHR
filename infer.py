@@ -29,7 +29,7 @@ def main():
     # Kiểm tra và hiển thị thiết bị phần cứng khi khởi tạo suy diễn
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("=" * 50)
-    print(f" KHỞI TẠO SUY DIỄN: Đang sử dụng thiết bị [{device.upper()}] để sinh kết quả.")
+    print(f" Thiết bị: [{str(device).upper()}]")
     print("=" * 50)
     
     with open(os.path.join(args.model_dir, 'metadata.pkl'), 'rb') as f:

@@ -38,7 +38,7 @@ def main():
     # Kiểm tra và hiển thị thiết bị phần cứng khi khởi tạo
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("=" * 50)
-    print(f" KHỞI TẠO THIẾT BỊ: Đang sử dụng [{device.upper()}] để huấn luyện mô hình.")
+    print(f" Thiết bị: [{str(device).upper()}]")
     print("=" * 50)
     
     print("Đang tải và tiền xử lý dữ liệu từ file pkl...")
