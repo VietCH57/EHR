@@ -53,7 +53,7 @@ def main():
     oof_predictions = np.zeros(len(train_df))
     
     for fold, (train_idx, val_idx) in enumerate(skf.split(X, y)):
-        print(f"\n⚡ Huấn luyện Fold {fold + 1}/5")
+        print(f"\n Huấn luyện Fold {fold + 1}/5")
         train_loader = DataLoader(EHRDataset(X.iloc[train_idx].reset_index(drop=True), num_cols, cat_cols, target_col), batch_size=batch_size, shuffle=True, drop_last=True)
         val_loader = DataLoader(EHRDataset(X.iloc[val_idx].reset_index(drop=True), num_cols, cat_cols, target_col), batch_size=batch_size, shuffle=False)
         
